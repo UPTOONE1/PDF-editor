@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Editor - Modal Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .content {
+            text-align: center;
+            background: white;
+            padding: 60px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .features {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            text-align: left;
+        }
+        .feature {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .feature h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .feature p {
+            color: #666;
+            font-size: 14px;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h1>Welcome to My Website</h1>
+        <p>Need to edit a PDF? Click the button below!</p>
+
+        <button class="btn" onclick="PDFEditorWidget.openModal()">
+            📄 Open PDF Editor
+        </button>
+
+        <div class="features">
+            <div class="feature">
+                <h3>Add Text</h3>
+                <p>Easily add text to any PDF document</p>
+            </div>
+            <div class="feature">
+                <h3>Sign Documents</h3>
+                <p>Draw your signature directly on the PDF</p>
+            </div>
+            <div class="feature">
+                <h3>100% Free</h3>
+                <p>No subscriptions, no hidden fees</p>
+            </div>
+            <div class="feature">
+                <h3>Private</h3>
+                <p>Everything happens in your browser</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include the PDF Editor Widget -->
+    <script src="pdf-editor-embed.js"></script>
+</body>
+</html>
