@@ -9,6 +9,11 @@ class PDFEditor {
         this.annotations = [];
         this.currentTool = 'text';
         this.signatureDataURL = null;
+        this.isSelectingRegion = false;
+        this.selectionStart = null;
+        this.detectedFont = null;
+        this.undoStack = [];
+        this.redoStack = [];
 
         this.initializeElements();
         this.attachEventListeners();
@@ -18,8 +23,11 @@ class PDFEditor {
     initializeElements() {
         this.pdfInput = document.getElementById('pdfInput');
         this.downloadBtn = document.getElementById('downloadBtn');
+        this.undoBtn = document.getElementById('undoBtn');
+        this.redoBtn = document.getElementById('redoBtn');
         this.textBtn = document.getElementById('textBtn');
         this.signatureBtn = document.getElementById('signatureBtn');
+        this.smartDetectBtn = document.getElementById('smartDetectBtn');
         this.prevPageBtn = document.getElementById('prevPage');
         this.nextPageBtn = document.getElementById('nextPage');
         this.pageInfo = document.getElementById('pageInfo');
@@ -31,13 +39,32 @@ class PDFEditor {
         this.closeModal = document.getElementById('closeModal');
         this.clearSignature = document.getElementById('clearSignature');
         this.saveSignature = document.getElementById('saveSignature');
+
+        // Text Editor elements
+        this.textEditorModal = document.getElementById('textEditorModal');
+        this.textEditorInput = document.getElementById('textEditorInput');
+        this.textEditorFont = document.getElementById('textEditorFont');
+        this.textEditorSize = document.getElementById('textEditorSize');
+        this.textEditorColor = document.getElementById('textEditorColor');
+        this.closeTextEditor = document.getElementById('closeTextEditor');
+        this.cancelTextEditor = document.getElementById('cancelTextEditor');
+        this.saveTextEditor = document.getElementById('saveTextEditor');
+        this.textBold = document.getElementById('textBold');
+        this.textItalic = document.getElementById('textItalic');
+        this.textUnderline = document.getElementById('textUnderline');
+        this.textAlignLeft = document.getElementById('textAlignLeft');
+        this.textAlignCenter = document.getElementById('textAlignCenter');
+        this.textAlignRight = document.getElementById('textAlignRight');
     }
 
     attachEventListeners() {
         this.pdfInput.addEventListener('change', (e) => this.handleFileUpload(e));
         this.downloadBtn.addEventListener('click', () => this.downloadPDF());
+        this.undoBtn.addEventListener('click', () => this.undo());
+        this.redoBtn.addEventListener('click', () => this.redo());
         this.textBtn.addEventListener('click', () => this.setTool('text'));
         this.signatureBtn.addEventListener('click', () => this.setTool('signature'));
+        this.smartDetectBtn.addEventListener('click', () => this.setTool('smartDetect'));
         this.prevPageBtn.addEventListener('click', () => this.changePage(-1));
         this.nextPageBtn.addEventListener('click', () => this.changePage(1));
         this.closeModal.addEventListener('click', () => this.closeSignatureModal());
@@ -48,6 +75,51 @@ class PDFEditor {
         this.signatureModal.addEventListener('click', (e) => {
             if (e.target === this.signatureModal) {
                 this.closeSignatureModal();
+            }
+        });
+
+        // Text Editor event listeners
+        this.closeTextEditor.addEventListener('click', () => this.closeTextEditorModal());
+        this.cancelTextEditor.addEventListener('click', () => this.closeTextEditorModal());
+        this.saveTextEditor.addEventListener('click', () => this.saveTextAnnotation());
+
+        // Close text editor modal when clicking outside
+        this.textEditorModal.addEventListener('click', (e) => {
+            if (e.target === this.textEditorModal) {
+                this.closeTextEditorModal();
+            }
+        });
+
+        // Live preview updates
+        this.textEditorInput.addEventListener('input', () => this.updateTextPreview());
+        this.textEditorFont.addEventListener('change', () => this.updateTextPreview());
+        this.textEditorSize.addEventListener('input', () => this.updateTextPreview());
+        this.textEditorColor.addEventListener('input', () => this.updateTextPreview());
+
+        // Formatting buttons
+        this.textBold.addEventListener('click', () => this.toggleFormat('bold'));
+        this.textItalic.addEventListener('click', () => this.toggleFormat('italic'));
+        this.textUnderline.addEventListener('click', () => this.toggleFormat('underline'));
+
+        // Alignment buttons
+        this.textAlignLeft.addEventListener('click', () => this.setAlignment('left'));
+        this.textAlignCenter.addEventListener('click', () => this.setAlignment('center'));
+        this.textAlignRight.addEventListener('click', () => this.setAlignment('right'));
+
+        // Add paste event listener for images and text
+        document.addEventListener('paste', (e) => this.handlePaste(e));
+
+        // Add keyboard shortcuts for undo/redo
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+Z for undo
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+            }
+            // Ctrl+Y or Ctrl+Shift+Z for redo
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                this.redo();
             }
         });
     }
@@ -142,6 +214,42 @@ class PDFEditor {
         this.currentTool = tool;
         this.textBtn.classList.toggle('active', tool === 'text');
         this.signatureBtn.classList.toggle('active', tool === 'signature');
+        this.smartDetectBtn.classList.toggle('active', tool === 'smartDetect');
+
+        const canvas = document.getElementById('pdfCanvas');
+        if (canvas) {
+            if (tool === 'smartDetect') {
+                canvas.style.cursor = 'crosshair';
+                this.showDetectInstructions();
+            } else {
+                canvas.style.cursor = tool === 'text' ? 'crosshair' : 'default';
+            }
+        }
+    }
+
+    showDetectInstructions() {
+        const message = document.createElement('div');
+        message.id = 'detectInstructions';
+        message.style.cssText = `
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(102, 126, 234, 0.95);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1001;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        message.textContent = '✨ Draw a box around text to detect its font and size';
+        document.body.appendChild(message);
+
+        setTimeout(() => {
+            const existing = document.getElementById('detectInstructions');
+            if (existing) existing.remove();
+        }, 4000);
     }
 
     async handleFileUpload(event) {
@@ -196,13 +304,88 @@ class PDFEditor {
 
         wrapper.appendChild(canvas);
 
-        // Add click handler for adding annotations
+        // Add handlers for adding annotations and smart detect
+        canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e, canvas));
+        canvas.addEventListener('mousemove', (e) => this.handleCanvasMouseMove(e, canvas));
+        canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e, canvas));
         canvas.addEventListener('click', (e) => this.handleCanvasClick(e, canvas));
 
         this.canvasContainer.appendChild(wrapper);
 
         // Re-render existing annotations for this page
         this.renderAnnotations();
+    }
+
+    handleCanvasMouseDown(event, canvas) {
+        if (this.currentTool !== 'smartDetect') return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        this.isSelectingRegion = true;
+        this.selectionStart = { x, y };
+
+        // Create selection overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'selectionOverlay';
+        overlay.style.cssText = `
+            position: absolute;
+            border: 2px dashed #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            pointer-events: none;
+            left: ${rect.left + x}px;
+            top: ${rect.top + y}px;
+            width: 0;
+            height: 0;
+            z-index: 998;
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    handleCanvasMouseMove(event, canvas) {
+        if (!this.isSelectingRegion || this.currentTool !== 'smartDetect') return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        const overlay = document.getElementById('selectionOverlay');
+        if (!overlay) return;
+
+        const width = Math.abs(x - this.selectionStart.x);
+        const height = Math.abs(y - this.selectionStart.y);
+        const left = Math.min(x, this.selectionStart.x);
+        const top = Math.min(y, this.selectionStart.y);
+
+        overlay.style.left = (rect.left + left) + 'px';
+        overlay.style.top = (rect.top + top) + 'px';
+        overlay.style.width = width + 'px';
+        overlay.style.height = height + 'px';
+    }
+
+    async handleCanvasMouseUp(event, canvas) {
+        if (!this.isSelectingRegion || this.currentTool !== 'smartDetect') return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        const width = Math.abs(x - this.selectionStart.x);
+        const height = Math.abs(y - this.selectionStart.y);
+        const left = Math.min(x, this.selectionStart.x);
+        const top = Math.min(y, this.selectionStart.y);
+
+        // Remove overlay
+        const overlay = document.getElementById('selectionOverlay');
+        if (overlay) overlay.remove();
+
+        this.isSelectingRegion = false;
+
+        // Only process if selection is large enough
+        if (width > 20 && height > 10) {
+            await this.detectFontInRegion(canvas, left, top, width, height);
+        }
     }
 
     handleCanvasClick(event, canvas) {
@@ -217,22 +400,456 @@ class PDFEditor {
         }
     }
 
-    addTextAnnotation(x, y) {
-        const text = prompt('Enter text:');
-        if (!text) return;
+    async detectFontInRegion(canvas, x, y, width, height) {
+        // Show loading indicator
+        const loading = document.createElement('div');
+        loading.id = 'aiLoading';
+        loading.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 1002;
+        `;
+        loading.innerHTML = '🤖 AI analyzing text...<br><small>Reading PDF font data</small>';
+        document.body.appendChild(loading);
+
+        try {
+            // Get the current page from PDF.js
+            const page = await this.pdfDoc.getPage(this.currentPage);
+            const textContent = await page.getTextContent();
+
+            // Convert selection coordinates to PDF coordinates
+            const viewport = page.getViewport({ scale: this.scale });
+            const pdfX = x;
+            const pdfY = y;
+            const pdfX2 = x + width;
+            const pdfY2 = y + height;
+
+            // Find text items within the selected region
+            const itemsInRegion = [];
+            for (const item of textContent.items) {
+                if (item.transform) {
+                    // Get text position in viewport coordinates
+                    const tx = item.transform[4];
+                    const ty = viewport.height - item.transform[5]; // Flip Y coordinate
+
+                    // Check if text is within selection box
+                    if (tx >= pdfX && tx <= pdfX2 && ty >= pdfY && ty <= pdfY2) {
+                        itemsInRegion.push(item);
+                    }
+                }
+            }
+
+            if (itemsInRegion.length === 0) {
+                throw new Error('No text found in selected area. Try selecting text more precisely.');
+            }
+
+            // Extract font information from the first text item
+            const firstItem = itemsInRegion[0];
+
+            // Get font size from transform matrix (element [0] is horizontal scaling)
+            const fontSize = Math.abs(firstItem.transform[0]);
+            const actualFontSize = Math.round(fontSize);
+
+            // Get font name
+            let fontName = firstItem.fontName || 'unknown';
+            let detectedFont = 'Helvetica'; // Default
+
+            // Map PDF font names to web fonts
+            if (fontName.includes('Helvetica') || fontName.includes('Arial')) {
+                detectedFont = 'Helvetica';
+            } else if (fontName.includes('Times') || fontName.includes('Serif')) {
+                detectedFont = 'Times New Roman';
+            } else if (fontName.includes('Courier') || fontName.includes('Mono')) {
+                detectedFont = 'Courier';
+            } else if (fontName.includes('Georgia')) {
+                detectedFont = 'Georgia';
+            } else if (fontName.includes('Verdana')) {
+                detectedFont = 'Verdana';
+            }
+
+            // Collect sample text
+            const sampleText = itemsInRegion.map(item => item.str).join(' ').substring(0, 100);
+
+            loading.remove();
+
+            // Show results
+            this.showDetectionResults(actualFontSize, detectedFont, sampleText, fontName);
+
+        } catch (error) {
+            loading.remove();
+            alert(`AI Detection failed: ${error.message}\n\nTip: Make sure to select an area with text in it.`);
+            console.error('Detection Error:', error);
+        }
+    }
+
+    showDetectionResults(fontSize, fontFamily, sampleText, pdfFontName) {
+        const result = document.createElement('div');
+        result.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 1002;
+            max-width: 450px;
+        `;
+
+        result.innerHTML = `
+            <h3 style="margin: 0 0 15px 0; color: #667eea;">✨ Font Detection Results</h3>
+            <div style="margin-bottom: 15px; line-height: 1.6;">
+                <strong>PDF Font:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${pdfFontName || 'Unknown'}</code><br>
+                <strong>Matched To:</strong> ${fontFamily}<br>
+                <strong>Font Size:</strong> ${fontSize}px<br>
+                <strong>Sample Text:</strong> <em style="color: #666;">"${sampleText.trim()}"</em>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="cancelDetect" style="padding: 10px 20px; border: none; background: #6c757d; color: white; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button id="applyDetect" style="padding: 10px 20px; border: none; background: #667eea; color: white; border-radius: 6px; cursor: pointer;">Use This Format</button>
+            </div>
+        `;
+
+        document.body.appendChild(result);
+
+        document.getElementById('cancelDetect').addEventListener('click', () => {
+            result.remove();
+            this.setTool('text');
+        });
+
+        document.getElementById('applyDetect').addEventListener('click', () => {
+            // Apply detected font settings
+            this.textEditorFont.value = fontFamily;
+            this.textEditorSize.value = fontSize;
+            this.fontSize.value = fontSize;
+
+            result.remove();
+            this.setTool('text');
+
+            // Show success message
+            const success = document.createElement('div');
+            success.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                z-index: 1001;
+            `;
+            success.textContent = `✓ Font set to ${fontFamily} ${fontSize}px - Click to add text`;
+            document.body.appendChild(success);
+            setTimeout(() => success.remove(), 3000);
+        });
+    }
+
+    async handlePaste(event) {
+        // Only handle paste when a PDF is loaded
+        if (!this.pdfDoc) return;
+
+        // Don't handle paste if user is typing in an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        let handled = false;
+
+        // Check for images first
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+
+            // Handle image paste (screenshots, copied images, etc.)
+            if (item.type.indexOf('image') !== -1) {
+                event.preventDefault();
+                const blob = item.getAsFile();
+                await this.handleImagePaste(blob);
+                handled = true;
+                break;
+            }
+        }
+
+        // If no image found, check for text
+        if (!handled) {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type === 'text/plain') {
+                    event.preventDefault();
+                    item.getAsString((text) => {
+                        this.handleTextPaste(text);
+                    });
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        if (handled) {
+            console.log('Paste handled successfully');
+        }
+    }
+
+    async handleImagePaste(blob) {
+        // Convert blob to data URL
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const dataURL = e.target.result;
+
+            // Get canvas center position for pasted image
+            const canvas = document.getElementById('pdfCanvas');
+            if (!canvas) return;
+
+            const centerX = canvas.width / 2 - 100; // Center image (assuming 200px width)
+            const centerY = canvas.height / 2 - 50; // Center image (assuming 100px height)
+
+            const annotation = {
+                type: 'signature', // Reuse signature type for pasted images
+                page: this.currentPage,
+                x: centerX,
+                y: centerY,
+                dataURL: dataURL,
+                width: 200,
+                height: 100,
+                id: Date.now()
+            };
+
+            this.saveState(); // Save state before adding
+            this.annotations.push(annotation);
+            this.renderAnnotations();
+
+            // Show feedback
+            console.log('Image pasted successfully at center of page');
+        };
+        reader.readAsDataURL(blob);
+    }
+
+    handleTextPaste(text) {
+        // Get canvas center position for pasted text
+        const canvas = document.getElementById('pdfCanvas');
+        if (!canvas) return;
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
 
         const annotation = {
             type: 'text',
             page: this.currentPage,
-            x: x,
-            y: y,
+            x: centerX,
+            y: centerY,
             text: text,
             fontSize: parseInt(this.fontSize.value),
             color: this.fontColor.value,
             id: Date.now()
         };
 
+        this.saveState(); // Save state before adding
         this.annotations.push(annotation);
+        this.renderAnnotations();
+
+        // Show feedback
+        console.log('Text pasted successfully at center of page');
+    }
+
+    addTextAnnotation(x, y) {
+        // Open the text editor modal instead of prompt
+        this.openTextEditorModal(x, y);
+    }
+
+    openTextEditorModal(x, y) {
+        this.textEditorModal.classList.add('active');
+        this.pendingTextPosition = { x, y };
+
+        // Create or get the editable text div
+        let editableDiv = document.getElementById('directEditableText');
+        if (!editableDiv) {
+            editableDiv = document.createElement('div');
+            editableDiv.id = 'directEditableText';
+            editableDiv.contentEditable = 'true';
+            editableDiv.setAttribute('spellcheck', 'true');
+            editableDiv.style.position = 'absolute';
+            editableDiv.style.minWidth = '200px';
+            editableDiv.style.minHeight = '30px';
+            editableDiv.style.outline = '2px solid #667eea';
+            editableDiv.style.padding = '5px';
+            editableDiv.style.background = 'rgba(255, 255, 255, 0.1)';
+            editableDiv.style.zIndex = '999';
+            editableDiv.style.cursor = 'text';
+            editableDiv.style.whiteSpace = 'pre-wrap';
+            editableDiv.style.wordWrap = 'break-word';
+            document.getElementById('canvasContainer').appendChild(editableDiv);
+        }
+
+        // Position the editable div at click location
+        const canvas = document.getElementById('pdfCanvas');
+        if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
+
+            // Convert click coordinates to container-relative position
+            editableDiv.style.left = (rect.left - containerRect.left + x) + 'px';
+            editableDiv.style.top = (rect.top - containerRect.top + y) + 'px';
+        }
+
+        editableDiv.innerHTML = '';
+
+        // Position the toolbar near the editable text box
+        const modalContent = this.textEditorModal.querySelector('.modal-content');
+        if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
+
+            // Position toolbar just below the editable text
+            const toolbarLeft = rect.left - containerRect.left + x;
+            const toolbarTop = rect.top - containerRect.top + y + 60; // 60px below text box
+
+            modalContent.style.position = 'fixed';
+            modalContent.style.left = (containerRect.left + toolbarLeft) + 'px';
+            modalContent.style.top = (containerRect.top + toolbarTop) + 'px';
+            modalContent.style.transform = 'none';
+            modalContent.style.margin = '0';
+        }
+
+        // Reset editor state
+        this.textEditorFont.value = 'Helvetica';
+        this.textEditorSize.value = this.fontSize.value;
+        this.textEditorColor.value = this.fontColor.value;
+        this.currentTextFormat = {
+            bold: false,
+            italic: false,
+            underline: false,
+            align: 'left'
+        };
+
+        // Reset button states
+        this.textBold.classList.remove('active');
+        this.textItalic.classList.remove('active');
+        this.textUnderline.classList.remove('active');
+        this.textAlignLeft.classList.add('active');
+        this.textAlignCenter.classList.remove('active');
+        this.textAlignRight.classList.remove('active');
+
+        // Apply initial formatting to editable div
+        this.applyFormattingToEditableDiv();
+
+        // Focus the editable div
+        setTimeout(() => {
+            editableDiv.focus();
+        }, 100);
+    }
+
+    closeTextEditorModal() {
+        this.textEditorModal.classList.remove('active');
+        this.pendingTextPosition = null;
+
+        // Remove the editable div
+        const editableDiv = document.getElementById('directEditableText');
+        if (editableDiv) {
+            editableDiv.remove();
+        }
+    }
+
+    updateTextPreview() {
+        // Apply formatting to the editable div instead of textarea
+        this.applyFormattingToEditableDiv();
+    }
+
+    applyFormattingToEditableDiv() {
+        const editableDiv = document.getElementById('directEditableText');
+        if (!editableDiv) return;
+
+        const font = this.textEditorFont.value;
+        const size = this.textEditorSize.value + 'px';
+        const color = this.textEditorColor.value;
+
+        let fontWeight = this.currentTextFormat?.bold ? 'bold' : 'normal';
+        let fontStyle = this.currentTextFormat?.italic ? 'italic' : 'normal';
+        let textDecoration = this.currentTextFormat?.underline ? 'underline' : 'none';
+        let textAlign = this.currentTextFormat?.align || 'left';
+
+        editableDiv.style.fontFamily = font;
+        editableDiv.style.fontSize = size;
+        editableDiv.style.color = color;
+        editableDiv.style.fontWeight = fontWeight;
+        editableDiv.style.fontStyle = fontStyle;
+        editableDiv.style.textDecoration = textDecoration;
+        editableDiv.style.textAlign = textAlign;
+    }
+
+    toggleFormat(format) {
+        if (!this.currentTextFormat) {
+            this.currentTextFormat = { bold: false, italic: false, underline: false, align: 'left' };
+        }
+
+        this.currentTextFormat[format] = !this.currentTextFormat[format];
+
+        // Update button state
+        if (format === 'bold') {
+            this.textBold.classList.toggle('active', this.currentTextFormat.bold);
+        } else if (format === 'italic') {
+            this.textItalic.classList.toggle('active', this.currentTextFormat.italic);
+        } else if (format === 'underline') {
+            this.textUnderline.classList.toggle('active', this.currentTextFormat.underline);
+        }
+
+        this.updateTextPreview();
+    }
+
+    setAlignment(align) {
+        if (!this.currentTextFormat) {
+            this.currentTextFormat = { bold: false, italic: false, underline: false, align: 'left' };
+        }
+
+        this.currentTextFormat.align = align;
+
+        // Update button states
+        this.textAlignLeft.classList.toggle('active', align === 'left');
+        this.textAlignCenter.classList.toggle('active', align === 'center');
+        this.textAlignRight.classList.toggle('active', align === 'right');
+
+        this.updateTextPreview();
+    }
+
+    saveTextAnnotation() {
+        const editableDiv = document.getElementById('directEditableText');
+        if (!editableDiv) return;
+
+        const text = editableDiv.innerText.trim();
+        if (!text) {
+            alert('Please enter some text.');
+            return;
+        }
+
+        const annotation = {
+            type: 'text',
+            page: this.currentPage,
+            x: this.pendingTextPosition.x,
+            y: this.pendingTextPosition.y,
+            text: text,
+            fontSize: parseInt(this.textEditorSize.value),
+            color: this.textEditorColor.value,
+            fontFamily: this.textEditorFont.value,
+            bold: this.currentTextFormat.bold,
+            italic: this.currentTextFormat.italic,
+            underline: this.currentTextFormat.underline,
+            align: this.currentTextFormat.align,
+            id: Date.now()
+        };
+
+        this.saveState(); // Save state before adding
+        this.annotations.push(annotation);
+        this.closeTextEditorModal();
         this.renderAnnotations();
     }
 
@@ -290,6 +907,7 @@ class PDFEditor {
             id: Date.now()
         };
 
+        this.saveState(); // Save state before adding
         this.annotations.push(annotation);
         this.closeSignatureModal();
         this.renderAnnotations();
@@ -321,8 +939,22 @@ class PDFEditor {
         div.dataset.id = annotation.id;
 
         if (annotation.type === 'text') {
+            const fontFamily = annotation.fontFamily || 'Helvetica';
+            const fontWeight = annotation.bold ? 'bold' : 'normal';
+            const fontStyle = annotation.italic ? 'italic' : 'normal';
+            const textDecoration = annotation.underline ? 'underline' : 'none';
+            const textAlign = annotation.align || 'left';
+
             div.innerHTML = `
-                <div class="annotation-text" style="font-size: ${annotation.fontSize}px; color: ${annotation.color};">
+                <div class="annotation-text" style="
+                    font-size: ${annotation.fontSize}px;
+                    color: ${annotation.color};
+                    font-family: ${fontFamily};
+                    font-weight: ${fontWeight};
+                    font-style: ${fontStyle};
+                    text-decoration: ${textDecoration};
+                    text-align: ${textAlign};
+                ">
                     ${this.escapeHtml(annotation.text)}
                 </div>
                 <button class="annotation-delete">×</button>
@@ -347,12 +979,20 @@ class PDFEditor {
             this.deleteAnnotation(annotation.id);
         });
 
-        // Select on click
+        // Select/unselect on click (toggle)
         div.addEventListener('click', () => {
+            const isCurrentlySelected = div.classList.contains('selected');
+
+            // Remove selection from all annotations
             document.querySelectorAll('.annotation').forEach(el =>
                 el.classList.remove('selected')
             );
-            div.classList.add('selected');
+
+            // If this annotation wasn't selected, select it
+            // If it was selected, leave it unselected (toggle behavior)
+            if (!isCurrentlySelected) {
+                div.classList.add('selected');
+            }
         });
 
         return div;
@@ -389,8 +1029,50 @@ class PDFEditor {
     }
 
     deleteAnnotation(id) {
+        this.saveState(); // Save state before deleting
         this.annotations = this.annotations.filter(ann => ann.id !== id);
         this.renderAnnotations();
+    }
+
+    saveState() {
+        // Save current annotations state to undo stack
+        this.undoStack.push(JSON.parse(JSON.stringify(this.annotations)));
+        // Clear redo stack when new action is performed
+        this.redoStack = [];
+        // Limit undo stack to 50 states
+        if (this.undoStack.length > 50) {
+            this.undoStack.shift();
+        }
+        this.updateUndoRedoButtons();
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) return;
+
+        // Save current state to redo stack
+        this.redoStack.push(JSON.parse(JSON.stringify(this.annotations)));
+
+        // Restore previous state
+        this.annotations = this.undoStack.pop();
+        this.renderAnnotations();
+        this.updateUndoRedoButtons();
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+
+        // Save current state to undo stack
+        this.undoStack.push(JSON.parse(JSON.stringify(this.annotations)));
+
+        // Restore next state
+        this.annotations = this.redoStack.pop();
+        this.renderAnnotations();
+        this.updateUndoRedoButtons();
+    }
+
+    updateUndoRedoButtons() {
+        this.undoBtn.disabled = this.undoStack.length === 0;
+        this.redoBtn.disabled = this.redoStack.length === 0;
     }
 
     escapeHtml(text) {
@@ -439,16 +1121,31 @@ class PDFEditor {
                         color: PDFLib.rgb(rgb.r / 255, rgb.g / 255, rgb.b / 255)
                     });
                 } else if (annotation.type === 'signature') {
-                    // Convert data URL to image
-                    const imageBytes = this.dataURLToBytes(annotation.dataURL);
-                    const image = await pdfDoc.embedPng(imageBytes);
+                    try {
+                        // Convert data URL to image
+                        const imageBytes = this.dataURLToBytes(annotation.dataURL);
 
-                    page.drawImage(image, {
-                        x: annotation.x / this.scale,
-                        y: height - ((annotation.y + annotation.height) / this.scale),
-                        width: annotation.width / this.scale,
-                        height: annotation.height / this.scale
-                    });
+                        // Try to embed as PNG first, fallback to JPG if it fails
+                        let image;
+                        try {
+                            image = await pdfDoc.embedPng(imageBytes);
+                        } catch (pngError) {
+                            console.warn('PNG embed failed, trying JPG conversion:', pngError);
+                            // Convert to JPG format
+                            const jpgBytes = await this.convertToJpg(annotation.dataURL);
+                            image = await pdfDoc.embedJpg(jpgBytes);
+                        }
+
+                        page.drawImage(image, {
+                            x: annotation.x / this.scale,
+                            y: height - ((annotation.y + annotation.height) / this.scale),
+                            width: annotation.width / this.scale,
+                            height: annotation.height / this.scale
+                        });
+                    } catch (imgError) {
+                        console.error('Error embedding signature image:', imgError);
+                        throw new Error(`Failed to embed signature: ${imgError.message}`);
+                    }
                 }
             }
 
@@ -466,7 +1163,7 @@ class PDFEditor {
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error saving PDF:', error);
-            alert('Failed to save PDF. Please try again.');
+            alert(`Failed to save PDF: ${error.message || 'Unknown error'}. Please check the console for details.`);
         }
     }
 
@@ -487,6 +1184,33 @@ class PDFEditor {
             bytes[i] = binaryString.charCodeAt(i);
         }
         return bytes;
+    }
+
+    async convertToJpg(dataURL) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                // Create a canvas to convert to JPG
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+
+                // Fill white background (JPG doesn't support transparency)
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw the image
+                ctx.drawImage(img, 0, 0);
+
+                // Convert to JPG data URL
+                const jpgDataURL = canvas.toDataURL('image/jpeg', 0.95);
+                const jpgBytes = this.dataURLToBytes(jpgDataURL);
+                resolve(jpgBytes);
+            };
+            img.onerror = () => reject(new Error('Failed to load image for conversion'));
+            img.src = dataURL;
+        });
     }
 }
 

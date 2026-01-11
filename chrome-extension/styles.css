@@ -211,6 +211,7 @@ header p {
     padding: 5px;
     min-width: 50px;
     min-height: 30px;
+    transform: translate(-50%, -50%);
 }
 
 .annotation:hover {
@@ -225,6 +226,7 @@ header p {
 .annotation-text {
     white-space: pre-wrap;
     word-wrap: break-word;
+    display: inline-block;
 }
 
 .annotation-delete {
@@ -335,6 +337,144 @@ header p {
 }
 
 .signature-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+/* Text Editor Modal Styles */
+.text-editor-modal {
+    max-width: 700px;
+}
+
+.text-editor-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.text-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-group label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+}
+
+.editor-select {
+    padding: 8px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+    min-width: 150px;
+}
+
+.editor-select:hover,
+.editor-select:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+.editor-input {
+    width: 70px;
+    padding: 8px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.editor-input:hover,
+.editor-input:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+.editor-color {
+    width: 50px;
+    height: 38px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.editor-color:hover {
+    border-color: #667eea;
+}
+
+.editor-btn {
+    padding: 8px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    color: #495057;
+}
+
+.editor-btn:hover {
+    background: #f8f9fa;
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.editor-btn.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.text-editor-preview {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 300px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#textEditorInput {
+    width: 100%;
+    min-height: 260px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    font-size: 16px;
+    font-family: Helvetica, Arial, sans-serif;
+    resize: vertical;
+    transition: all 0.3s ease;
+    line-height: 1.6;
+}
+
+#textEditorInput:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.text-editor-controls {
     display: flex;
     gap: 10px;
     margin-top: 20px;

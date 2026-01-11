@@ -31,6 +31,22 @@ class PDFEditor {
         this.closeModal = document.getElementById('closeModal');
         this.clearSignature = document.getElementById('clearSignature');
         this.saveSignature = document.getElementById('saveSignature');
+
+        // Text Editor elements
+        this.textEditorModal = document.getElementById('textEditorModal');
+        this.textEditorInput = document.getElementById('textEditorInput');
+        this.textEditorFont = document.getElementById('textEditorFont');
+        this.textEditorSize = document.getElementById('textEditorSize');
+        this.textEditorColor = document.getElementById('textEditorColor');
+        this.closeTextEditor = document.getElementById('closeTextEditor');
+        this.cancelTextEditor = document.getElementById('cancelTextEditor');
+        this.saveTextEditor = document.getElementById('saveTextEditor');
+        this.textBold = document.getElementById('textBold');
+        this.textItalic = document.getElementById('textItalic');
+        this.textUnderline = document.getElementById('textUnderline');
+        this.textAlignLeft = document.getElementById('textAlignLeft');
+        this.textAlignCenter = document.getElementById('textAlignCenter');
+        this.textAlignRight = document.getElementById('textAlignRight');
     }
 
     attachEventListeners() {
@@ -50,6 +66,37 @@ class PDFEditor {
                 this.closeSignatureModal();
             }
         });
+
+        // Text Editor event listeners
+        this.closeTextEditor.addEventListener('click', () => this.closeTextEditorModal());
+        this.cancelTextEditor.addEventListener('click', () => this.closeTextEditorModal());
+        this.saveTextEditor.addEventListener('click', () => this.saveTextAnnotation());
+
+        // Close text editor modal when clicking outside
+        this.textEditorModal.addEventListener('click', (e) => {
+            if (e.target === this.textEditorModal) {
+                this.closeTextEditorModal();
+            }
+        });
+
+        // Live preview updates
+        this.textEditorInput.addEventListener('input', () => this.updateTextPreview());
+        this.textEditorFont.addEventListener('change', () => this.updateTextPreview());
+        this.textEditorSize.addEventListener('input', () => this.updateTextPreview());
+        this.textEditorColor.addEventListener('input', () => this.updateTextPreview());
+
+        // Formatting buttons
+        this.textBold.addEventListener('click', () => this.toggleFormat('bold'));
+        this.textItalic.addEventListener('click', () => this.toggleFormat('italic'));
+        this.textUnderline.addEventListener('click', () => this.toggleFormat('underline'));
+
+        // Alignment buttons
+        this.textAlignLeft.addEventListener('click', () => this.setAlignment('left'));
+        this.textAlignCenter.addEventListener('click', () => this.setAlignment('center'));
+        this.textAlignRight.addEventListener('click', () => this.setAlignment('right'));
+
+        // Add paste event listener for images and text
+        document.addEventListener('paste', (e) => this.handlePaste(e));
     }
 
     initializeSignatureCanvas() {
@@ -217,15 +264,100 @@ class PDFEditor {
         }
     }
 
-    addTextAnnotation(x, y) {
-        const text = prompt('Enter text:');
-        if (!text) return;
+    async handlePaste(event) {
+        // Only handle paste when a PDF is loaded
+        if (!this.pdfDoc) return;
+
+        // Don't handle paste if user is typing in an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        let handled = false;
+
+        // Check for images first
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+
+            // Handle image paste (screenshots, copied images, etc.)
+            if (item.type.indexOf('image') !== -1) {
+                event.preventDefault();
+                const blob = item.getAsFile();
+                await this.handleImagePaste(blob);
+                handled = true;
+                break;
+            }
+        }
+
+        // If no image found, check for text
+        if (!handled) {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type === 'text/plain') {
+                    event.preventDefault();
+                    item.getAsString((text) => {
+                        this.handleTextPaste(text);
+                    });
+                    handled = true;
+                    break;
+                }
+            }
+        }
+
+        if (handled) {
+            console.log('Paste handled successfully');
+        }
+    }
+
+    async handleImagePaste(blob) {
+        // Convert blob to data URL
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const dataURL = e.target.result;
+
+            // Get canvas center position for pasted image
+            const canvas = document.getElementById('pdfCanvas');
+            if (!canvas) return;
+
+            const centerX = canvas.width / 2 - 100; // Center image (assuming 200px width)
+            const centerY = canvas.height / 2 - 50; // Center image (assuming 100px height)
+
+            const annotation = {
+                type: 'signature', // Reuse signature type for pasted images
+                page: this.currentPage,
+                x: centerX,
+                y: centerY,
+                dataURL: dataURL,
+                width: 200,
+                height: 100,
+                id: Date.now()
+            };
+
+            this.annotations.push(annotation);
+            this.renderAnnotations();
+
+            // Show feedback
+            console.log('Image pasted successfully at center of page');
+        };
+        reader.readAsDataURL(blob);
+    }
+
+    handleTextPaste(text) {
+        // Get canvas center position for pasted text
+        const canvas = document.getElementById('pdfCanvas');
+        if (!canvas) return;
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
 
         const annotation = {
             type: 'text',
             page: this.currentPage,
-            x: x,
-            y: y,
+            x: centerX,
+            y: centerY,
             text: text,
             fontSize: parseInt(this.fontSize.value),
             color: this.fontColor.value,
@@ -233,6 +365,133 @@ class PDFEditor {
         };
 
         this.annotations.push(annotation);
+        this.renderAnnotations();
+
+        // Show feedback
+        console.log('Text pasted successfully at center of page');
+    }
+
+    addTextAnnotation(x, y) {
+        // Open the text editor modal instead of prompt
+        this.openTextEditorModal(x, y);
+    }
+
+    openTextEditorModal(x, y) {
+        this.textEditorModal.classList.add('active');
+        this.pendingTextPosition = { x, y };
+
+        // Reset editor state
+        this.textEditorInput.value = '';
+        this.textEditorFont.value = 'Helvetica';
+        this.textEditorSize.value = this.fontSize.value;
+        this.textEditorColor.value = this.fontColor.value;
+        this.currentTextFormat = {
+            bold: false,
+            italic: false,
+            underline: false,
+            align: 'left'
+        };
+
+        // Reset button states
+        this.textBold.classList.remove('active');
+        this.textItalic.classList.remove('active');
+        this.textUnderline.classList.remove('active');
+        this.textAlignLeft.classList.add('active');
+        this.textAlignCenter.classList.remove('active');
+        this.textAlignRight.classList.remove('active');
+
+        // Update preview
+        this.updateTextPreview();
+
+        // Focus input
+        setTimeout(() => {
+            this.textEditorInput.focus();
+        }, 100);
+    }
+
+    closeTextEditorModal() {
+        this.textEditorModal.classList.remove('active');
+        this.pendingTextPosition = null;
+    }
+
+    updateTextPreview() {
+        const font = this.textEditorFont.value;
+        const size = this.textEditorSize.value + 'px';
+        const color = this.textEditorColor.value;
+
+        let fontWeight = this.currentTextFormat?.bold ? 'bold' : 'normal';
+        let fontStyle = this.currentTextFormat?.italic ? 'italic' : 'normal';
+        let textDecoration = this.currentTextFormat?.underline ? 'underline' : 'none';
+        let textAlign = this.currentTextFormat?.align || 'left';
+
+        this.textEditorInput.style.fontFamily = font;
+        this.textEditorInput.style.fontSize = size;
+        this.textEditorInput.style.color = color;
+        this.textEditorInput.style.fontWeight = fontWeight;
+        this.textEditorInput.style.fontStyle = fontStyle;
+        this.textEditorInput.style.textDecoration = textDecoration;
+        this.textEditorInput.style.textAlign = textAlign;
+    }
+
+    toggleFormat(format) {
+        if (!this.currentTextFormat) {
+            this.currentTextFormat = { bold: false, italic: false, underline: false, align: 'left' };
+        }
+
+        this.currentTextFormat[format] = !this.currentTextFormat[format];
+
+        // Update button state
+        if (format === 'bold') {
+            this.textBold.classList.toggle('active', this.currentTextFormat.bold);
+        } else if (format === 'italic') {
+            this.textItalic.classList.toggle('active', this.currentTextFormat.italic);
+        } else if (format === 'underline') {
+            this.textUnderline.classList.toggle('active', this.currentTextFormat.underline);
+        }
+
+        this.updateTextPreview();
+    }
+
+    setAlignment(align) {
+        if (!this.currentTextFormat) {
+            this.currentTextFormat = { bold: false, italic: false, underline: false, align: 'left' };
+        }
+
+        this.currentTextFormat.align = align;
+
+        // Update button states
+        this.textAlignLeft.classList.toggle('active', align === 'left');
+        this.textAlignCenter.classList.toggle('active', align === 'center');
+        this.textAlignRight.classList.toggle('active', align === 'right');
+
+        this.updateTextPreview();
+    }
+
+    saveTextAnnotation() {
+        const text = this.textEditorInput.value.trim();
+        if (!text) {
+            alert('Please enter some text.');
+            return;
+        }
+
+        const annotation = {
+            type: 'text',
+            page: this.currentPage,
+            x: this.pendingTextPosition.x,
+            y: this.pendingTextPosition.y,
+            text: text,
+            fontSize: parseInt(this.textEditorSize.value),
+            color: this.textEditorColor.value,
+            fontFamily: this.textEditorFont.value,
+            bold: this.currentTextFormat.bold,
+            italic: this.currentTextFormat.italic,
+            underline: this.currentTextFormat.underline,
+            align: this.currentTextFormat.align,
+            id: Date.now()
+        };
+
+        this.annotations.push(annotation);
+        this.closeTextEditorModal();
         this.renderAnnotations();
     }
 
@@ -321,8 +580,22 @@ class PDFEditor {
         div.dataset.id = annotation.id;
 
         if (annotation.type === 'text') {
+            const fontFamily = annotation.fontFamily || 'Helvetica';
+            const fontWeight = annotation.bold ? 'bold' : 'normal';
+            const fontStyle = annotation.italic ? 'italic' : 'normal';
+            const textDecoration = annotation.underline ? 'underline' : 'none';
+            const textAlign = annotation.align || 'left';
+
             div.innerHTML = `
-                <div class="annotation-text" style="font-size: ${annotation.fontSize}px; color: ${annotation.color};">
+                <div class="annotation-text" style="
+                    font-size: ${annotation.fontSize}px;
+                    color: ${annotation.color};
+                    font-family: ${fontFamily};
+                    font-weight: ${fontWeight};
+                    font-style: ${fontStyle};
+                    text-decoration: ${textDecoration};
+                    text-align: ${textAlign};
+                ">
                     ${this.escapeHtml(annotation.text)}
                 </div>
                 <button class="annotation-delete">×</button>
@@ -447,16 +720,31 @@ class PDFEditor {
                         color: PDFLib.rgb(rgb.r / 255, rgb.g / 255, rgb.b / 255)
                     });
                 } else if (annotation.type === 'signature') {
-                    // Convert data URL to image
-                    const imageBytes = this.dataURLToBytes(annotation.dataURL);
-                    const image = await pdfDoc.embedPng(imageBytes);
+                    try {
+                        // Convert data URL to image
+                        const imageBytes = this.dataURLToBytes(annotation.dataURL);
 
-                    page.drawImage(image, {
-                        x: annotation.x / this.scale,
-                        y: height - ((annotation.y + annotation.height) / this.scale),
-                        width: annotation.width / this.scale,
-                        height: annotation.height / this.scale
-                    });
+                        // Try to embed as PNG first, fallback to JPG if it fails
+                        let image;
+                        try {
+                            image = await pdfDoc.embedPng(imageBytes);
+                        } catch (pngError) {
+                            console.warn('PNG embed failed, trying JPG conversion:', pngError);
+                            // Convert to JPG format
+                            const jpgBytes = await this.convertToJpg(annotation.dataURL);
+                            image = await pdfDoc.embedJpg(jpgBytes);
+                        }
+
+                        page.drawImage(image, {
+                            x: annotation.x / this.scale,
+                            y: height - ((annotation.y + annotation.height) / this.scale),
+                            width: annotation.width / this.scale,
+                            height: annotation.height / this.scale
+                        });
+                    } catch (imgError) {
+                        console.error('Error embedding signature image:', imgError);
+                        throw new Error(`Failed to embed signature: ${imgError.message}`);
+                    }
                 }
             }
 
@@ -474,7 +762,7 @@ class PDFEditor {
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error saving PDF:', error);
-            alert('Failed to save PDF. Please try again.');
+            alert(`Failed to save PDF: ${error.message || 'Unknown error'}. Please check the console for details.`);
         }
     }
 
@@ -495,6 +783,33 @@ class PDFEditor {
             bytes[i] = binaryString.charCodeAt(i);
         }
         return bytes;
+    }
+
+    async convertToJpg(dataURL) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                // Create a canvas to convert to JPG
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+
+                // Fill white background (JPG doesn't support transparency)
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw the image
+                ctx.drawImage(img, 0, 0);
+
+                // Convert to JPG data URL
+                const jpgDataURL = canvas.toDataURL('image/jpeg', 0.95);
+                const jpgBytes = this.dataURLToBytes(jpgDataURL);
+                resolve(jpgBytes);
+            };
+            img.onerror = () => reject(new Error('Failed to load image for conversion'));
+            img.src = dataURL;
+        });
     }
 }
 

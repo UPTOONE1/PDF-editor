@@ -211,6 +211,7 @@ header p {
     padding: 5px;
     min-width: 50px;
     min-height: 30px;
+    transform: translate(-50%, -50%);
 }
 
 .annotation:hover {
@@ -225,6 +226,7 @@ header p {
 .annotation-text {
     white-space: pre-wrap;
     word-wrap: break-word;
+    display: inline-block;
 }
 
 .annotation-delete {
@@ -270,7 +272,7 @@ header p {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(1px);
 }
 
 .modal.active {
@@ -341,6 +343,173 @@ header p {
     justify-content: flex-end;
 }
 
+/* Text Editor Modal Styles - Floating Transparent */
+.text-editor-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.text-editor-modal.active {
+    display: block;
+}
+
+.text-editor-modal .modal-content {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(2px);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+    pointer-events: auto;
+    max-width: 450px;
+}
+
+.text-editor-container {
+    background: transparent;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.text-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(3px);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-group label {
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 13px;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.editor-select {
+    padding: 6px 10px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.editor-select:hover,
+.editor-select:focus {
+    border-color: #667eea;
+    outline: none;
+    background: rgba(255, 255, 255, 1);
+}
+
+.editor-input {
+    width: 60px;
+    padding: 6px 10px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.9);
+    transition: all 0.3s ease;
+}
+
+.editor-input:hover,
+.editor-input:focus {
+    border-color: #667eea;
+    outline: none;
+    background: rgba(255, 255, 255, 1);
+}
+
+.editor-color {
+    width: 40px;
+    height: 32px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.editor-color:hover {
+    border-color: #667eea;
+}
+
+.editor-btn {
+    padding: 6px 10px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    color: #495057;
+}
+
+.editor-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.editor-btn.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.text-editor-preview {
+    background: transparent;
+    border-radius: 8px;
+    padding: 0;
+    min-height: auto;
+}
+
+#textEditorInput {
+    width: 100%;
+    min-height: 120px;
+    border: 2px solid rgba(102, 126, 234, 0.4);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 16px;
+    font-family: Helvetica, Arial, sans-serif;
+    resize: vertical;
+    transition: all 0.3s ease;
+    line-height: 1.6;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(1px);
+    color: #000;
+}
+
+#textEditorInput::placeholder {
+    color: rgba(0, 0, 0, 0.4);
+}
+
+#textEditorInput:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.text-editor-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: flex-end;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     body {
@@ -368,4 +537,158 @@ header p {
     .canvas-container {
         padding: 20px;
     }
+}
+/* Text Editor Modal Styles - Minimal Floating Toolbar */
+.text-editor-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.text-editor-modal.active {
+    display: block;
+}
+
+.text-editor-modal .modal-content {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    pointer-events: auto;
+    max-width: none;
+    width: auto;
+}
+
+.text-editor-modal .modal-header {
+    display: none; /* Hide the "Add Text" header */
+}
+
+.text-editor-container {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+}
+
+.text-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    background: transparent;
+    backdrop-filter: none;
+    border-radius: 8px;
+    box-shadow: none;
+    border: none;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-group label {
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 12px;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.9), 0 0 6px rgba(255, 255, 255, 0.7);
+}
+
+.editor-select {
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 110px;
+}
+
+.editor-select:hover,
+.editor-select:focus {
+    background: white;
+    outline: none;
+}
+
+.editor-input {
+    width: 50px;
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    transition: all 0.2s ease;
+}
+
+.editor-input:hover,
+.editor-input:focus {
+    background: white;
+    outline: none;
+}
+
+.editor-color {
+    width: 35px;
+    height: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.editor-btn {
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: #495057;
+}
+
+.editor-btn:hover {
+    background: white;
+}
+
+.editor-btn.active {
+    background: white;
+    border-color: white;
+    color: #667eea;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.text-editor-preview {
+    display: none; /* Hide the textarea box completely */
+}
+
+#textEditorInput {
+    display: none; /* Hide the textarea */
+}
+
+.text-editor-controls {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    justify-content: flex-end;
+}
+
+.text-editor-controls .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+}
+
+/* Direct editable text on PDF */
+#directEditableText {
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+#directEditableText:focus {
+    outline: 2px solid #667eea;
+    background: rgba(255, 255, 255, 0.2);
 }

@@ -1,0 +1,138 @@
+/* Text Editor Modal Styles - Minimal Floating Toolbar */
+.text-editor-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.text-editor-modal.active {
+    display: block;
+}
+
+.text-editor-modal .modal-content {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    pointer-events: auto;
+    max-width: 600px;
+}
+
+.text-editor-modal .modal-header {
+    display: none; /* Hide the "Add Text" header */
+}
+
+.text-editor-container {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+}
+
+.text-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(102, 126, 234, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-group label {
+    font-weight: 600;
+    color: white;
+    font-size: 12px;
+}
+
+.editor-select {
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 110px;
+}
+
+.editor-select:hover,
+.editor-select:focus {
+    background: white;
+    outline: none;
+}
+
+.editor-input {
+    width: 50px;
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    transition: all 0.2s ease;
+}
+
+.editor-input:hover,
+.editor-input:focus {
+    background: white;
+    outline: none;
+}
+
+.editor-color {
+    width: 35px;
+    height: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.editor-btn {
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: #495057;
+}
+
+.editor-btn:hover {
+    background: white;
+}
+
+.editor-btn.active {
+    background: white;
+    border-color: white;
+    color: #667eea;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.text-editor-preview {
+    display: none; /* Hide the textarea box completely */
+}
+
+#textEditorInput {
+    display: none; /* Hide the textarea */
+}
+
+.text-editor-controls {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    justify-content: flex-end;
+}
+
+.text-editor-controls .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+}
