@@ -472,25 +472,31 @@ class PDFEditor {
                     const textWidth = item.width || (item.str.length * textHeight * 0.6);
 
                     // Y coordinate in PDF is from bottom, canvas is from top
-                    // So we need: canvasY = viewportHeight - pdfY
+                    // So we need: canvasY = viewportHeight - pdfY - textHeight
+                    // The text baseline is at ty, so top of text is at ty - textHeight
                     const canvasY = viewport.height - ty;
 
                     allTextItems.push({
                         text: item.str,
                         x: tx,
                         y: canvasY,
+                        pdfY: ty,
                         width: textWidth,
                         height: textHeight
                     });
 
                     // Check if text bounds intersect with selection box
-                    // Text item bounds: [tx, canvasY] to [tx + textWidth, canvasY + textHeight]
+                    // Text baseline is at canvasY, text top is at (canvasY - textHeight)
+                    // Text item bounds: [tx, canvasY - textHeight] to [tx + textWidth, canvasY]
                     // Selection bounds: [selX1, selY1] to [selX2, selY2]
+                    const textTop = canvasY - textHeight;
+                    const textBottom = canvasY;
+                    
                     const intersects =
                         tx < selX2 &&
                         tx + textWidth > selX1 &&
-                        canvasY < selY2 &&
-                        canvasY + textHeight > selY1;
+                        textTop < selY2 &&
+                        textBottom > selY1;
 
                     if (intersects) {
                         itemsInRegion.push(item);
@@ -504,12 +510,17 @@ class PDFEditor {
             console.log(`Items in selection: ${itemsInRegion.length}`);
             if (itemsInRegion.length > 0) {
                 console.log('Found items:', itemsInRegion.map(i => i.str).join(' '));
-                console.log('Found items details:', itemsInRegion.map(i => ({
-                    text: i.str,
-                    x: i.transform[4],
-                    y: viewport.height - i.transform[5],
-                    fontSize: Math.abs(i.transform[0])
-                })));
+                console.log('Found items details:', itemsInRegion.map(i => {
+                    const fontSize = Math.abs(i.transform[0]);
+                    const y = viewport.height - i.transform[5];
+                    return {
+                        text: i.str,
+                        x: i.transform[4],
+                        yBaseline: y,
+                        yTop: y - fontSize,
+                        fontSize: fontSize
+                    };
+                }));
             }
             console.log('======================');
 
@@ -579,10 +590,12 @@ class PDFEditor {
         // Draw boxes around each text item
         allTextItems.forEach(item => {
             const box = document.createElement('div');
+            // Text baseline is at item.y, text top is at (item.y - item.height)
+            const textTop = item.y - item.height;
             box.style.cssText = `
                 position: absolute;
                 left: ${item.x}px;
-                top: ${item.y}px;
+                top: ${textTop}px;
                 width: ${item.width}px;
                 height: ${item.height}px;
                 border: 1px solid rgba(255, 0, 0, 0.5);
