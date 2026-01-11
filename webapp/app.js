@@ -27,6 +27,7 @@ class PDFEditor {
         this.redoBtn = document.getElementById('redoBtn');
         this.textBtn = document.getElementById('textBtn');
         this.signatureBtn = document.getElementById('signatureBtn');
+        this.smartDetectBtn = document.getElementById('smartDetectBtn');
         this.prevPageBtn = document.getElementById('prevPage');
         this.nextPageBtn = document.getElementById('nextPage');
         this.pageInfo = document.getElementById('pageInfo');
@@ -63,6 +64,7 @@ class PDFEditor {
         this.redoBtn.addEventListener('click', () => this.redo());
         this.textBtn.addEventListener('click', () => this.setTool('text'));
         this.signatureBtn.addEventListener('click', () => this.setTool('signature'));
+        this.smartDetectBtn.addEventListener('click', () => this.setTool('smartDetect'));
         this.prevPageBtn.addEventListener('click', () => this.changePage(-1));
         this.nextPageBtn.addEventListener('click', () => this.changePage(1));
         this.closeModal.addEventListener('click', () => this.closeSignatureModal());
@@ -220,10 +222,17 @@ class PDFEditor {
         this.currentTool = tool;
         this.textBtn.classList.toggle('active', tool === 'text');
         this.signatureBtn.classList.toggle('active', tool === 'signature');
+        this.smartDetectBtn.classList.toggle('active', tool === 'smartDetect');
 
         const canvas = document.getElementById('pdfCanvas');
         if (canvas) {
-            canvas.style.cursor = tool === 'text' ? 'crosshair' : 'default';
+            if (tool === 'smartDetect') {
+                canvas.style.cursor = 'crosshair';
+            } else if (tool === 'text') {
+                canvas.style.cursor = 'crosshair';
+            } else {
+                canvas.style.cursor = 'default';
+            }
         }
     }
 
