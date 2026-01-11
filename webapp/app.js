@@ -211,6 +211,14 @@ class PDFEditor {
     }
 
     setTool(tool) {
+        // Close any open modals when switching tools
+        this.closeTextEditorModal();
+        this.closeSignatureModal();
+
+        // Remove any detection result modal
+        const detectionModal = document.getElementById('detectionResultModal');
+        if (detectionModal) detectionModal.remove();
+
         this.currentTool = tool;
         this.textBtn.classList.toggle('active', tool === 'text');
         this.signatureBtn.classList.toggle('active', tool === 'signature');
@@ -384,7 +392,16 @@ class PDFEditor {
 
         // Only process if selection is large enough
         if (width > 20 && height > 10) {
-            await this.detectFontInRegion(canvas, left, top, width, height);
+            // Convert CSS coordinates to canvas coordinates
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const canvasLeft = left * scaleX;
+            const canvasTop = top * scaleY;
+            const canvasWidth = width * scaleX;
+            const canvasHeight = height * scaleY;
+
+            await this.detectFontInRegion(canvas, canvasLeft, canvasTop, canvasWidth, canvasHeight);
         }
     }
 
@@ -424,30 +441,81 @@ class PDFEditor {
             const page = await this.pdfDoc.getPage(this.currentPage);
             const textContent = await page.getTextContent();
 
-            // Convert selection coordinates to PDF coordinates
+            // Get viewport for coordinate conversion
             const viewport = page.getViewport({ scale: this.scale });
-            const pdfX = x;
-            const pdfY = y;
-            const pdfX2 = x + width;
-            const pdfY2 = y + height;
+
+            // Add margin for better detection (30px padding on each side)
+            const margin = 30;
+            const selX1 = x - margin;
+            const selY1 = y - margin;
+            const selX2 = x + width + margin;
+            const selY2 = y + height + margin;
+
+            console.log('=== AI DETECTION DEBUG ===');
+            console.log('Canvas selection (input):', { x, y, width, height });
+            console.log('Selection with margin:', { selX1, selY1, selX2, selY2 });
+            console.log('Viewport dimensions:', { width: viewport.width, height: viewport.height });
+            console.log('Scale:', this.scale);
 
             // Find text items within the selected region
             const itemsInRegion = [];
-            for (const item of textContent.items) {
-                if (item.transform) {
-                    // Get text position in viewport coordinates
-                    const tx = item.transform[4];
-                    const ty = viewport.height - item.transform[5]; // Flip Y coordinate
+            const allTextItems = [];
 
-                    // Check if text is within selection box
-                    if (tx >= pdfX && tx <= pdfX2 && ty >= pdfY && ty <= pdfY2) {
+            for (const item of textContent.items) {
+                if (item.transform && item.str.trim()) {
+                    // Get text position from transform matrix
+                    // transform[4] = x position, transform[5] = y position (from bottom)
+                    const tx = item.transform[4];
+                    const ty = item.transform[5];
+                    const textHeight = Math.abs(item.transform[0]); // Font size
+                    const textWidth = item.width || (item.str.length * textHeight * 0.6);
+
+                    // Y coordinate in PDF is from bottom, canvas is from top
+                    // So we need: canvasY = viewportHeight - pdfY
+                    const canvasY = viewport.height - ty;
+
+                    allTextItems.push({
+                        text: item.str,
+                        x: tx,
+                        y: canvasY,
+                        width: textWidth,
+                        height: textHeight
+                    });
+
+                    // Check if text bounds intersect with selection box
+                    // Text item bounds: [tx, canvasY] to [tx + textWidth, canvasY + textHeight]
+                    // Selection bounds: [selX1, selY1] to [selX2, selY2]
+                    const intersects =
+                        tx < selX2 &&
+                        tx + textWidth > selX1 &&
+                        canvasY < selY2 &&
+                        canvasY + textHeight > selY1;
+
+                    if (intersects) {
                         itemsInRegion.push(item);
                     }
                 }
             }
 
+            // Debug logging
+            console.log(`Total text items on page: ${allTextItems.length}`);
+            console.log('First 10 text items:', allTextItems.slice(0, 10));
+            console.log(`Items in selection: ${itemsInRegion.length}`);
+            if (itemsInRegion.length > 0) {
+                console.log('Found items:', itemsInRegion.map(i => i.str).join(' '));
+                console.log('Found items details:', itemsInRegion.map(i => ({
+                    text: i.str,
+                    x: i.transform[4],
+                    y: viewport.height - i.transform[5],
+                    fontSize: Math.abs(i.transform[0])
+                })));
+            }
+            console.log('======================');
+
             if (itemsInRegion.length === 0) {
-                throw new Error('No text found in selected area. Try selecting text more precisely.');
+                // Show visual debug overlay of all text positions
+                this.showTextDebugOverlay(canvas, allTextItems);
+                throw new Error('No text found in selected area. The page has ' + allTextItems.length + ' text items total. Check console for their positions.');
             }
 
             // Extract font information from the first text item
@@ -489,8 +557,63 @@ class PDFEditor {
         }
     }
 
+    showTextDebugOverlay(canvas, allTextItems) {
+        // Remove existing debug overlay
+        const existing = document.getElementById('textDebugOverlay');
+        if (existing) existing.remove();
+
+        // Create debug overlay showing all text positions
+        const overlay = document.createElement('div');
+        overlay.id = 'textDebugOverlay';
+        overlay.style.cssText = `
+            position: absolute;
+            left: ${canvas.offsetLeft}px;
+            top: ${canvas.offsetTop}px;
+            width: ${canvas.offsetWidth}px;
+            height: ${canvas.offsetHeight}px;
+            pointer-events: none;
+            z-index: 999;
+        `;
+
+        // Draw boxes around each text item
+        allTextItems.forEach(item => {
+            const box = document.createElement('div');
+            box.style.cssText = `
+                position: absolute;
+                left: ${item.x}px;
+                top: ${item.y}px;
+                width: ${item.width}px;
+                height: ${item.height}px;
+                border: 1px solid rgba(255, 0, 0, 0.5);
+                background: rgba(255, 0, 0, 0.1);
+                font-size: 10px;
+                color: red;
+                overflow: hidden;
+                white-space: nowrap;
+            `;
+            box.textContent = item.text;
+            overlay.appendChild(box);
+        });
+
+        document.body.appendChild(overlay);
+
+        // Auto-remove after 10 seconds
+        setTimeout(() => overlay.remove(), 10000);
+
+        console.log('Debug overlay added showing ' + allTextItems.length + ' text items');
+    }
+
     showDetectionResults(fontSize, fontFamily, sampleText, pdfFontName) {
+        // Close any open modals first
+        this.closeTextEditorModal();
+        this.closeSignatureModal();
+
+        // Remove any existing detection result
+        const existing = document.getElementById('detectionResultModal');
+        if (existing) existing.remove();
+
         const result = document.createElement('div');
+        result.id = 'detectionResultModal';
         result.style.cssText = `
             position: fixed;
             top: 50%;
@@ -526,12 +649,15 @@ class PDFEditor {
         });
 
         document.getElementById('applyDetect').addEventListener('click', () => {
-            // Apply detected font settings
+            // Apply detected font settings to both toolbar and editor
             this.textEditorFont.value = fontFamily;
             this.textEditorSize.value = fontSize;
             this.fontSize.value = fontSize;
 
+            // Remove modal
             result.remove();
+
+            // Switch to text tool
             this.setTool('text');
 
             // Show success message
@@ -546,8 +672,9 @@ class PDFEditor {
                 padding: 12px 20px;
                 border-radius: 6px;
                 z-index: 1001;
+                font-weight: 600;
             `;
-            success.textContent = `✓ Font set to ${fontFamily} ${fontSize}px - Click to add text`;
+            success.textContent = `✓ Font set to ${fontFamily} ${fontSize}px - Click on PDF to add text`;
             document.body.appendChild(success);
             setTimeout(() => success.remove(), 3000);
         });
